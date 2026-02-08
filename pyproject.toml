@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "ground-control"
+version = "0.1.0"
+description = "Ground Control: Pull cloud context to your local environment."
+authors = ["Antigravity <antigravity@example.com>"]
+readme = "README.md"
+packages = [{include = "ground_control"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+typer = {extras = ["all"], version = "^0.9.0"}
+rich = "^13.7.0"
+pydantic = "^2.6.0"
+google-cloud-run = "^0.10.0"
+google-cloud-secret-manager = "^2.19.0"
+docker = "^7.0.0"
+mcp = "^0.1.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+ag = "ground_control.cli:app"
