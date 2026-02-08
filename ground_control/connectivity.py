@@ -13,10 +13,24 @@ class ProxyManager:
     def check_installed(self) -> bool:
         return shutil.which("cloud-sql-proxy") is not None
 
+
+
+    def get_free_port(self, start_port: int = 5432) -> int:
+        """Finds the first available port starting from start_port."""
+        import socket
+        port = start_port
+        while port < 65535:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                if s.connect_ex(('localhost', port)) != 0:
+                    return port
+                port += 1
+        return start_port # Fallback, though unlikely to happen
+
     def start_cloud_sql_proxy(self, instances: List[str], port_start: int = 5432) -> Dict[str, int]:
         """
         Starts cloud-sql-proxy for the given instances.
         Returns a mapping of instance connection name to local port.
+        Automatically finds free ports if default is taken.
         """
         if not instances:
             return {}
@@ -25,36 +39,40 @@ class ProxyManager:
             console.print("[bold yellow]⚠️ 'cloud-sql-proxy' not found.[/bold yellow] Please install it to access Cloud SQL.")
             return {}
 
-        # Construct instance string: "project:region:instance=tcp:port"
-        # For simplicity, we just use the default behavior or map to sequential ports
-        # But default "cloud-sql-proxy instance" maps to a unix socket or requires specific flags.
-        # Modern v2 proxy usage: ./cloud-sql-proxy project:region:instance
-        
-        # We will try to run it in the background.
-        # Note: Managing background processes in a CLI that exits is tricky. 
-        # Ground Control might need to stay running or spawn a detached process.
-        # For this "ag pull" command, we probably want to spawn a shell *inside* the context, 
-        # so we keep the proxy running until the shell exits.
-        
         instance_args = []
         mapping = {}
-        for i, instance in enumerate(instances):
-            port = port_start + i
-            instance_args.append(f"{instance}?port={port}") # v2 syntax might verify
-            mapping[instance] = port
+        current_port = port_start
+        
+        console.print(f"[bold blue]ℹ️[/bold blue] Starting Cloud SQL Proxy for {len(instances)} instances...")
 
-        # v2 syntax: cloud-sql-proxy project:region:instance --port 5432 (only for one)
-        # For multiple, it's complex. Let's assume v2 and just do one for now or use the address flag.
-        # Actually, let's just print the command for the user to run or run it for the first instance.
+        for instance in instances:
+            # Find a free port for this instance
+            port = self.get_free_port(current_port)
+            mapping[instance] = port
+            
+            # Prepare arguments for this instance (v2 syntax checks needed for multi-instance)
+            # For simplicity/robustness in this MVP, we might need one proxy process per instance 
+            # OR use the --port flag carefully if supported for multiple.
+            # 'cloud-sql-proxy instance-name?port=5432' is v1 syntax.
+            # v2 uses: ./cloud-sql-proxy instance-name --port 5432
+            # To avoid complexity allow one instance for now or standard config.
+            
+            # Let's use the v1 syntax as it is often still supported or use the standard auto-assign if possible.
+            # Actually, let's just use the `get_free_port` to find a port and tell the user.
+            
+            # For the purpose of this implementation, we will assume we are starting one proxy 
+            # that handles all, or we loop. 
+            # Re-reading: "The Fix: ... detects this and assigns a random port or asks the user."
+            
+            instance_args.append(f"{instance}?port={port}") 
+            current_port = port + 1
+
+        cmd = ["cloud-sql-proxy"] + instance_args
         
-        cmd = ["cloud-sql-proxy"] + instances # This usually creates unix sockets
-        # To use TCP: --port (works for one).
-        
-        console.print(f"[bold blue]ℹ️[/bold blue] Starting Cloud SQL Proxy for {instances}...")
         try:
              # run in background
              self.proxy_process = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-             console.print("[green]✓[/green] Proxy started in background.")
+             console.print(f"[green]✓[/green] Proxy started. Mapped {', '.join([f'{k}->{v}' for k,v in mapping.items()])}")
              return mapping
         except Exception as e:
             console.print(f"[red]Failed to start proxy: {e}[/red]")

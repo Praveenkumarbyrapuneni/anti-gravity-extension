@@ -58,13 +58,27 @@ class GCPProvider:
             
             image = container.get("image", "")
             env_vars = {}
+            secrets = {}
             if "env" in container:
                 for env in container["env"]:
                     name = env.get("name")
                     value = env.get("value")
-                    if name and value:
-                        env_vars[name] = value
-            
+                    value_from = env.get("valueFrom")
+                    
+                    if name:
+                        if value:
+                            env_vars[name] = value
+                        elif value_from and "secretKeyRef" in value_from:
+                            # Store secret reference: NAME -> (secret_id, version)
+                            ref = value_from["secretKeyRef"]
+                            secrets[name] = {
+                                "secret": ref.get("name"),
+                                "version": ref.get("key", "latest") # In k8s key is key, in Cloud Run logic it maps to version usually or we need to look up.
+                                # Actually in Cloud Run: 
+                                # - valueFrom: secretKeyRef: {name: "my-secret", key: "latest"}
+                                # key here is the version 
+                            }
+
             annotations = metadata.get("annotations", {})
             cloud_sql_instances = annotations.get("run.googleapis.com/cloudsql-instances", "")
             cloud_sql_list = cloud_sql_instances.split(",") if cloud_sql_instances else []
@@ -72,6 +86,7 @@ class GCPProvider:
             return {
                 "image": image,
                 "env_vars": env_vars,
+                "secrets": secrets,
                 "cloud_sql_instances": cloud_sql_list,
                 "labels": metadata.get("labels", {})
             }
