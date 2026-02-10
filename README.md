@@ -1,4 +1,16 @@
-# 🛸 Antigravity Extension (Ground Control)
+# Antigravity Extension (Ground Control)
+
+**What it is:** CLI tool to connect local development to GCP environments via secure tunneling, automated port handling, and reproducible setup.
+
+**Why it matters:** Reduces friction when debugging production-like systems locally while keeping security and developer experience in mind.
+
+**Highlights**
+- Secure tunneling + automatic port collision handling
+- MCP integration + memory-first workflow to avoid loading unnecessary context
+- Clear setup + usage docs for reproducibility
+
+**Link:** https://github.com/Praveenkumarbyrapuneni/anti-gravity-extension
+
 
 > "Reversing the polarity of the cloud. Instead of pushing code to the cloud, we pull the cloud's context to the code."
 
